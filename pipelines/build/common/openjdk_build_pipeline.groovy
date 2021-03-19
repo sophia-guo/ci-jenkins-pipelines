@@ -444,6 +444,16 @@ class Build {
 
     }
 
+    private void adoptiumLinuxInstall(String arch, String product, String version) {
+        context.build job: "adoptium-packages-linux",
+            propagate: true,
+            parameters: [
+                    context.string(name: 'PRODUCT', value: "${product}"),
+                    context.string(name: 'VERSION', value: "${version}"),
+                    context.string(name: 'PLATFORM', value: "${arch}")
+            ]
+    }
+
     /*
     Run the Windows installer downstream jobs.
     We run two jobs if we have a JRE (see https://github.com/AdoptOpenJDK/openjdk-build/issues/1751).
@@ -547,7 +557,25 @@ class Build {
             context.stage("installer") {
                 switch (buildConfig.TARGET_OS) {
                     case "mac": context.sh 'rm -f workspace/target/*.pkg workspace/target/*.pkg.json workspace/target/*.pkg.sha256.txt; done'; buildMacInstaller(versionData); break
-                    case "linux": buildLinuxInstaller(versionData); break
+                    case "linux": 
+                        buildLinuxInstaller(versionData)
+                        // adoptium-packages-linux installer build and test
+                        if ( getJavaVersionNumber() <= 11) {
+                            String version = getJavaVersionNumber() as String
+                            if (buildConfig.ARCHITECTURE == 'x64' || buildConfig.ARCHITECTURE == 'aarch64') {
+                                String arch = buildConfig.ARCHITECTURE
+                                String product = ""
+                                if (buildConfig.VARIANT == 'hotspot') {
+                                    product = "Temurin"
+                                } 
+                                if (buildConfig.VARIANT == 'dragonwell') {
+                                    product = "dragonwell"
+                                    
+                                }
+                            }
+                            adoptiumLinuxInstall(arch, product, version)
+                        }
+                        break
                     case "windows": buildWindowsInstaller(versionData); break
                     default: break
                 }
