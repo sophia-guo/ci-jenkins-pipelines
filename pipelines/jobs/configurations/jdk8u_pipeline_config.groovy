@@ -32,9 +32,18 @@ class Config8 {
                 configureArgs       : [
                         "openj9"      : '--enable-jitserver',
                         "dragonwell"  : '--enable-unlimited-crypto --with-jvm-variants=server  --with-zlib=system',
+                ],
+                testDynamic : [
+                        hotspot       : [
+                          testLists   : ["extended.openjdk"],
+                          numMachines : 4
+                        ],
+                        openj9        : [
+                          testLists   : ["sanity.openjdk"],
+                          numMachines : 3
+                        ]
                 ]
         ],
-
         x64Windows    : [
                 os                  : 'windows',
                 arch                : 'x64',
@@ -116,7 +125,8 @@ class Config8 {
                 dockerFile: [
                         dragonwell: 'pipelines/build/dockerFiles/dragonwell_aarch64.dockerfile'
                 ],
-                test                 : 'default'
+                test                 : 'default',
+                testDynamic          : false
         ],
 
         x64LinuxXL       : [

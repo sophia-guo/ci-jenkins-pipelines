@@ -34,6 +34,10 @@ class Config11 {
                         "corretto"    : '--enable-dtrace=auto',
                         "SapMachine"  : '--enable-dtrace=auto',
                         "dragonwell"  : '--enable-dtrace=auto --enable-unlimited-crypto --with-jvm-variants=server --with-zlib=system --with-jvm-features=zgc'
+                ],
+                testDynamic :          [
+                           testLists   : ["extended.openjdk"],
+                           numMachines : 2
                 ]
         ],
 
@@ -130,7 +134,8 @@ class Config11 {
                         "openj9" : '--enable-dtrace=auto',
                         "corretto" : '--enable-dtrace=auto',
                         "dragonwell" : "--enable-dtrace=auto --with-extra-cflags=\"-march=armv8.2-a+crypto\" --with-extra-cxxflags=\"-march=armv8.2-a+crypto\""
-                ]
+                ],
+                testDynamic        : false
         ],
 
         x64LinuxXL    : [
@@ -165,7 +170,8 @@ class Config11 {
                 arch                 : 'aarch64',
                 test                 : 'default',
                 additionalFileNameTag: "linuxXL",
-                configureArgs        : '--with-noncompressedrefs --enable-dtrace=auto'
+                configureArgs        : '--with-noncompressedrefs --enable-dtrace=auto',
+                testDynamic          : false
         ],
         riscv64Linux      :  [
                 os                   : 'linux',
