@@ -32,7 +32,10 @@ node ("master") {
   def testStats = []
 
   stage("getPipelineStatus") {
-    if (variant == "temurin") { // temurin only for now
+    if (variant == "temurin") {
+        variant = "hotspot"
+    }
+    if (variant == "hotspot") { // temurin only for now
       // Determine nightly pipeline health by looking at published assets.
       // In particular, look at one data set for published binaries (Linux x64).
       // If no published assets happened the last 4 days, the nightly pipeline
