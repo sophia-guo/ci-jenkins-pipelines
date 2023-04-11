@@ -48,6 +48,7 @@ pipeline {
                         def retVal = sh returnStatus: true, script: "diff -q -r url1Dir1 url1Dir2 ${excludeFlags}"
                         if (retVal != 0) {
                             currentBuild.result = 'FAILURE'
+                            emailext body: 'The difference is over 5%', subject: 'Comparable build status', to: 'weguo@redhat.com'
                             error 'Error: two builds are not the same!'
                         } else {
                             echo 'Success: two builds are the same!'
