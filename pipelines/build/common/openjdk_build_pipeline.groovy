@@ -479,7 +479,6 @@ class Build {
                             } catch (Exception e) {
                                 context.echo "Cannot run copyArtifacts from job ${jobName}. Exception: ${e.message}. Skipping copyArtifacts..."
                             }
-                            context.archiveArtifacts allowEmptyArchive: true, artifacts: 'workspace/target/AQAvitTaps/*.tap', fingerprint: true
                         }
                     }
                 }
@@ -1903,6 +1902,12 @@ class Build {
                             if (buildConfig.TEST_LIST.size() > 0) {
                                 def testStages = runAQATests()
                                 context.parallel testStages
+                            }
+                            context.node('worker') {
+                                def tapFileName = filename.replaceAll('.zip', '.tar.gz')
+                                tapFileName = "AQAvitTaps_${tapFileName}"
+                                context.sh "tar czf ${tapFileName} ./workspace/target/AQAvitTaps"
+                                context.archiveArtifacts allowEmptyArchive: true, artifacts: "${tapFileName}", fingerprint: true
                             }
                         } else {
                             context.println("[ERROR]Smoke tests are not successful! AQA and Tck tests are blocked ")

@@ -856,10 +856,11 @@ class Builder implements Serializable {
                                                         target: "target/${config.TARGET_OS}/${config.ARCHITECTURE}/${config.VARIANT}/",
                                                         flatten: true
                                                 )
+                                                //Could also put in same places as other artifacts.
                                                 context.copyArtifacts(
                                                         projectName: downstreamJobName,
                                                         selector: context.specific("${downstreamJob.getNumber()}"),
-                                                        filter: 'workspace/target/AQAvitTaps/*.tap',
+                                                        filter: 'AQAvitTaps_*',
                                                         fingerprintArtifacts: true,
                                                         target: "target/${config.TARGET_OS}/${config.ARCHITECTURE}/${config.VARIANT}/AQAvitTaps/",
                                                         flatten: true,
