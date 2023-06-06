@@ -6,6 +6,7 @@ runTests = enableTests
 runParallel = enableTestDynamicParallel
 runInstaller = true
 runSigner = true
+runReproducibleCompare = true
 cleanWsBuildOutput = true
 jdkVersion = "${JAVA_VERSION}"
 isLightweight = true
@@ -105,6 +106,7 @@ pipelineJob("${BUILD_FOLDER}/${JOB_NAME}") {
         booleanParam('enableTestDynamicParallel', runParallel, 'If set to true test will be run parallel')
         booleanParam('enableInstallers', runInstaller, 'If set to true the installer pipeline will be executed')
         booleanParam('enableSigner', runSigner, 'If set to true the signer pipeline will be executed')
+        booleanParam('enableReproducibleCompare', runReproducibleCompare, 'If set to true the reproducible compare job might be triggerred')
         stringParam('additionalConfigureArgs', '', "Additional arguments that will be ultimately passed to OpenJDK's <code>./configure</code>")
         stringParam('additionalBuildArgs', '', 'Additional arguments to be passed to <code>makejdk-any-platform.sh</code>')
         stringParam('overrideFileNameVersion', '', "When forming the filename, ignore the part of the filename derived from the publishName or timestamp and override it.<br/>For instance if you set this to 'FOO' the final file name will be of the form: <code>OpenJDK8U-jre_ppc64le_linux_openj9_FOO.tar.gz</code>")

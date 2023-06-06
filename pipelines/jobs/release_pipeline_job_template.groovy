@@ -6,6 +6,7 @@ Boolean runTests = true
 Boolean runParallel = true
 Boolean runInstaller = true
 Boolean runSigner = true
+Boolean runReproducibleCompare = false
 Boolean cleanWsBuildOutput = true
 Boolean isLightweight = false  // since this is to checkout on a releaseTag, better to use false or might not found tag/SHA1 on the tip
 
@@ -81,6 +82,7 @@ pipelineJob("${BUILD_FOLDER}/${JOB_NAME}") {
         booleanParam('enableTestDynamicParallel', runParallel, 'If set to true test will be run parallel')
         booleanParam('enableInstallers', runInstaller, 'If set to true the installer pipeline will be executed')
         booleanParam('enableSigner', runSigner, 'If set to true the signer pipeline will be executed')
+        booleanParam('enableReproducibleCompare', runReproducibleCompare, 'If set to true the reproducible compare job might be triggerred')
         stringParam('additionalBuildArgs', '', 'Additional arguments to be passed to <code>makejdk-any-platform.sh</code>')
         stringParam('overrideFileNameVersion', '', "When forming the filename, ignore the part of the filename derived from the publishName or timestamp and override it.<br/>For instance if you set this to 'FOO' the final file name will be of the form: <code>OpenJDK8U-jre_ppc64le_linux_openj9_FOO.tar.gz</code>")
         booleanParam('cleanWorkspaceBeforeBuild', false, 'Clean out the workspace before the build')
