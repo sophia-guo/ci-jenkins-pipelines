@@ -43,9 +43,9 @@ pipeline {
                         }
                     }
                     echo "reproucudecParams is ${reproducedParams}"
-                    def scmRef = reproducedParams['SCM Ref']
-                    def buildTimeStamp = reproducedParams['Build Timestamp']
-                    def buildRef = reproducedParams['Temurin Build Ref']
+                    def scmRef = reproducedParams["SCM Ref"]
+                    def buildTimeStamp = reproducedParams["Build Timestamp"]
+                    def buildRef = reproducedParams["Temurin Build Ref"]
                     echo "${scmRef}, ${buildRef}"
                     //buildRef = buildRef.substring(buildRef.lastIndexOf('/')+1)
                     echo "${scmRef}, ${buildRef}"
