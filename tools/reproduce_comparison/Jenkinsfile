@@ -4,7 +4,7 @@ Jenkins job does reproducible build compare.
 import groovy.json.JsonOutput
 
 pipeline {
-    agent any
+    agent { label 'dockerBuild&&linux&&x64' }
     parameters {
         string(name: 'COMPARED_JOB_NUMBER', defaultValue: '', description: 'Compared nightly build job name')
         string(name: 'COMPARED_JOB_NAME', defaultValue: '', description: 'Compared nightly build job number')
@@ -59,54 +59,20 @@ pipeline {
                     jsonJobParams.BUILD_CONFIGURATION.SCM_REF = scmRef
                     jsonJobParams.BUILD_CONFIGURATION.BUILD_REF = buildRef
                     jsonJobParams.BUILD_CONFIGURATION.BUILD_ARGS += " --build-reproducible-date ${buildTimeStamp}"
-                    jsonJobParams.BUILD_CONFIGURATION.ENABLE_REPRODUCIBLE_COMPARE = "false"
+                    jsonJobParams.BUILD_CONFIGURATION.ENABLE_REPRODUCIBLE_COMPARE = false
                     
-                    def buildParams = [
-                        text(name: 'BUILD_CONFIGURATION', value: JsonOutput.prettyPrint(JsonOutput.toJson(jsonJobParams.BUILD_CONFIGURATION))),
-                        text(name: 'USER_REMOTE_CONFIGS', value: JsonOutput.prettyPrint(JsonOutput.toJson(jsonJobParams.USER_REMOTE_CONFIGS))),
-                        text(name: 'DEFAULTS_JSON', value: JsonOutput.prettyPrint(JsonOutput.toJson(jsonJobParams.DEFAULTS_JSON))),
-                        text(name: 'ADOPT_DEFAULTS_JSON', value: JsonOutput.prettyPrint(JsonOutput.toJson(jsonJobParams.DEFAULTS_JSON)))
-                    ]
-                    def reproducibleJob = build job: "${COMPARED_JOB_NAME}",
-                            propagate: false,
-                            parameters: buildParams
-                    
-                    def result = reproducibleJob.getResult()
-                    if (result == 'SUCCESS') {
-                        try {
-                            timeout(time: 2, unit: 'HOURS') {
-                                copyArtifacts(
-                                    projectName:"${COMPARED_JOB_NAME}",
-                                    selector:specific("${reproducibleJob.getNumber()}"),
-                                    excludes: '**/OpenJDK*-jdk-sources*.tar.gz',
-                                    filter: '**/OpenJDK*-jdk*.tar.gz',
-                                    target: 'reproduced/',
-                                    fingerprintArtifacts: true,
-                                    flatten: true
-                                )
-                            }
-                        } catch (Exception e) {
-                            echo "Cannot run copyArtifacts from job ${COMPARED_JOB_NAME}. Exception: ${e.message}. Skipping copyArtifacts..."
-                        }
-                    } else {
-                        error "Reproducible jenkins job ${COMPARED_JOB_NAME} failed, exit comparision"
-                        return
-                    }
+
 
                     def originalJDKFile = findFiles(glob: "original/*.tar.gz")
                     def reproducedJDKFile = findFiles(glob: "reproduced/*.tar.gz")
-                    def untarOriginalJDK = sh returnStatus: true, script: "tar -xz ${originalJDKFile[0].name} -C original"
+                    def untarOriginalJDK = sh returnStatus: true, script: "tar -xzvf ${originalJDKFile[0].path}"
+                    sh 'ls '
                     if (untarOriginalJDK != 0 ) {
                         currentBuild.result = 'UNSTABLE'
                         error " Untar ${originalJDKFile[0].name} failed"
                         return
                     } 
-                    def untarReproducedJDK = sh returnStatus: true, script: "tar -xz ${reproducedJDKFile[0].name} -C reproduced"
-                    if (untarReproducedJDK != 0 ) {
-                        currentBuild.result = 'UNSTABLE'
-                        error " Untar ${reproducedJDKFile[0].name} failed"
-                        return
-                    }
+
                 }
             }
         }

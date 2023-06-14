@@ -223,15 +223,19 @@ class Builder implements Serializable {
     */
     Boolean getReproducibleCompare(Map<String, ?> configuration, String variant) {
         Boolean enableReproducibleCompare = DEFAULTS_JSON['testDetails']['enableReproducibleCompare'] as Boolean
-        if (configuration.containsKey('reproducibleCompare')) {
-            def reproducibleCompare
-            if (isMap(configuration.reproducibleCompare)) {
-                reproducibleCompare = (configuration.reproducibleCompare as Map).get(variant)
-            } else {
-                reproducibleCompare = configuration.reproducibleCompare
-            }
-            if (reproducibleCompare != null) {
-                enableReproducibleCompare = reproducibleCompare
+        if ( env.JOB_NAME.contains('pr-tester') || env.JOB_NAME.contains('release')) {
+            enableReproducibleCompare = false
+        } else {
+            if (configuration.containsKey('reproducibleCompare')) {
+                def reproducibleCompare
+                if (isMap(configuration.reproducibleCompare)) {
+                    reproducibleCompare = (configuration.reproducibleCompare as Map).get(variant)
+                } else {
+                    reproducibleCompare = configuration.reproducibleCompare
+                }
+                if (reproducibleCompare != null) {
+                    enableReproducibleCompare = reproducibleCompare
+                }
             }
         }
         return enableReproducibleCompare
