@@ -112,7 +112,7 @@ pipeline {
         }
         stage('Compare') {
             steps {
-                checkout([$class: 'GitSCM', branches: [[name: 'master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "temurin-build"]], submoduleCfg: [], userRemoteConfigs: [[url: "https://github.com/adoptium/temurin-build.git"]]])
+                checkout([$class: 'GitSCM', branches: [[name: 'ReproD']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "temurin-build"]], submoduleCfg: [], userRemoteConfigs: [[url: "https://github.com/sophia-guo/openjdk-build.git"]]])
                 script {
                     try {
                         dir('temurin-build/tooling') {
