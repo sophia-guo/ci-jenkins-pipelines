@@ -6,9 +6,9 @@ import groovy.json.JsonOutput
 pipeline {
     agent { label 'dockerBuild&&linux&&x64' }
     parameters {
-        string(name: 'COMPARED_JOB_NUMBER', defaultValue: '', description: 'Compared nightly build job name')
+        string(name: 'COMPARED_JOB_NUMBER1', defaultValue: '', description: 'Compared nightly build job name')
+        string(name: 'COMPARED_JOB_NUMBER2', defaultValue: '', description: 'Compared nightly build job name')
         string(name: 'COMPARED_JOB_NAME', defaultValue: '', description: 'Compared nightly build job number')
-        string(name: 'COMPARED_JOB_PARAMS', defaultValue: '', description: 'Compared nightly build job parameters')
     }
 
     stages {
@@ -22,99 +22,45 @@ pipeline {
                                 flatten: true, 
                                 projectName: "${params.COMPARED_JOB_NAME}",
                                 target: 'original/',
-                                selector: specific("${params.COMPARED_JOB_NUMBER}")
+                                selector: specific("${params.COMPARED_JOB_NUMBER1}")
+                copyArtifacts excludes: '**/OpenJDK*-sbom*metadata.json,**/OpenJDK*-jdk-sources*.tar.gz', 
+                                filter: '**/OpenJDK*-jdk*.tar.gz,**/OpenJDK*-sbom*.json',
+                                fingerprintArtifacts: true, 
+                                flatten: true, 
+                                projectName: "${params.COMPARED_JOB_NAME}",
+                                target: 'reproduced/',
+                                selector: specific("${params.COMPARED_JOB_NUMBER1}")
                 script {
-                    def sbomFiles = findFiles(glob: "**/OpenJDK*-sbom*.json")
-                    def sbomParams = readJSON file: "${sbomFiles[0].path}"
-
-                    def sbomProperties = sbomParams.components[0].properties
-                    def reproducedParams = [:]
-                    sbomProperties.each { propertyItem -> 
-                        def paramFound = false
-                        propertyItem.each { key, value ->
-                            if (value in ["SCM Ref", "Temurin Build Ref", "Build Timestamp"]) {
-                                paramFound = true
-                            }
-                        }
-                        if (paramFound) {
-                            reproducedParams.put(propertyItem.name, propertyItem.value)
-                        }
-                    }
-                    
-                    def scmRef = reproducedParams["SCM Ref"]
-                    def buildTimeStamp = "'" + reproducedParams["Build Timestamp"] + "'"
-                    def buildRef = reproducedParams["Temurin Build Ref"]
-                    buildRef = buildRef.substring(buildRef.lastIndexOf('/')+1)
-
-                    // Convert COMPARED_JOB_PARAMS to json formatt string
-                    def jobParams = COMPARED_JOB_PARAMS.replaceAll("=", ':')
-                    jobParams = jobParams.replace("ADOPT_DEFAULTS_JSON", "ADOPT_DEFAULTS_TEMP")
-                    jobParams = jobParams.replace("DEFAULTS_JSON", "\"DEFAULTS_JSON\"")
-                    jobParams = jobParams.replace("USER_REMOTE_CONFIGS", "\"USER_REMOTE_CONFIGS\"")
-                    jobParams = jobParams.replace("ADOPT_DEFAULTS_TEMP", "\"ADOPT_DEFAULTS_JSON\"")
-                    jobParams = jobParams.replace("BUILD_CONFIGURATION", "\"BUILD_CONFIGURATION\"")
-                    
-                    // Set Reproducible build parameters
-                    def jsonJobParams = new groovy.json.JsonSlurper().parseText(jobParams)
-                    jsonJobParams.BUILD_CONFIGURATION.SCM_REF = scmRef
-                    jsonJobParams.BUILD_CONFIGURATION.BUILD_REF = buildRef
-                    jsonJobParams.BUILD_CONFIGURATION.BUILD_ARGS += " --build-reproducible-date ${buildTimeStamp}"
-                    jsonJobParams.BUILD_CONFIGURATION.ENABLE_REPRODUCIBLE_COMPARE = false
-                    jsonJobParams.BUILD_CONFIGURATION.ENABLE_TESTS = false
-                    jsonJobParams.BUILD_CONFIGURATION.ENABLE_INSTALLERS = false
-                    
-                    def buildParams = [
-                        text(name: 'BUILD_CONFIGURATION', value: JsonOutput.prettyPrint(JsonOutput.toJson(jsonJobParams.BUILD_CONFIGURATION))),
-                        text(name: 'USER_REMOTE_CONFIGS', value: JsonOutput.prettyPrint(JsonOutput.toJson(jsonJobParams.USER_REMOTE_CONFIGS))),
-                        text(name: 'DEFAULTS_JSON', value: JsonOutput.prettyPrint(JsonOutput.toJson(jsonJobParams.DEFAULTS_JSON))),
-                        text(name: 'ADOPT_DEFAULTS_JSON', value: JsonOutput.prettyPrint(JsonOutput.toJson(jsonJobParams.DEFAULTS_JSON)))
-                    ]
-                    def reproducibleJob = build job: "${COMPARED_JOB_NAME}",
-                            propagate: false,
-                            parameters: buildParams
-                    
-                    def result = reproducibleJob.getResult()
-                    if (result == 'SUCCESS') {
-                        try {
-                            timeout(time: 2, unit: 'HOURS') {
-                                copyArtifacts(
-                                    projectName:"${COMPARED_JOB_NAME}",
-                                    selector:specific("${reproducibleJob.getNumber()}"),
-                                    excludes: '**/OpenJDK*-jdk-sources*.tar.gz',
-                                    filter: '**/OpenJDK*-jdk*.tar.gz',
-                                    target: 'reproduced/',
-                                    fingerprintArtifacts: true,
-                                    flatten: true
-                                )
-                            }
-                        } catch (Exception e) {
-                            echo "Cannot run copyArtifacts from job ${COMPARED_JOB_NAME}. Exception: ${e.message}. Skipping copyArtifacts..."
-                        }
-                    } else {
-                        error "Reproducible jenkins job ${COMPARED_JOB_NAME} failed, exit comparision"
-                        return
-                    }
 
                     def originalJDKFile = findFiles(glob: "original/*.tar.gz")
                     def reproducedJDKFile = findFiles(glob: "reproduced/*.tar.gz")
-                    def untarOriginalJDK = sh returnStatus: true, script: "tar xzf ${originalJDKFile[0].path} -C original"
+                    def untarOriginalJDK = sh returnStatus: true, script: "tar xzf ${originalJDKFile[0].path} --strip-components=1 -C original"
                     if (untarOriginalJDK != 0 ) {
                         currentBuild.result = 'UNSTABLE'
                         error " Untar ${originalJDKFile[0].name} failed"
                         return
                     }
-                    def untarReproducedJDK = sh returnStatus: true, script: "tar xzf ${reproducedJDKFile[0].path} -C reproduced"
+                    def untarReproducedJDK = sh returnStatus: true, script: "tar xzf ${reproducedJDKFile[0].path} --strip-components=1 -C reproduced"
                     if (untarReproducedJDK != 0 ) {
                         currentBuild.result = 'UNSTABLE'
-                        error " Untar ${reproducedJDKFile[0].name} failed"
+                        error " Untar ${originalJDKFile[0].name} failed"
                         return
                     }
+                    sh """
+                    
+                    find . -type f -name jrt-fs.jar
+                    find . -type f -name '*.tar.gz' -delete
+                    find . -type f -name '*.json' -delete
+                    cd original/lib
+                    ls
+                    """
                 }
             }
         }
+        
         stage('Compare') {
             steps {
-                checkout([$class: 'GitSCM', branches: [[name: 'master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "temurin-build"]], submoduleCfg: [], userRemoteConfigs: [[url: "https://github.com/adoptium/temurin-build.git"]]])
+                checkout([$class: 'GitSCM', branches: [[name: 'ReproD']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "temurin-build"]], submoduleCfg: [], userRemoteConfigs: [[url: "https://github.com/sophia-guo/openjdk-build.git"]]])
                 script {
                     try {
                         dir('temurin-build/tooling') {
