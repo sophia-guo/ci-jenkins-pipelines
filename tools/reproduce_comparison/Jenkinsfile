@@ -4,10 +4,8 @@ Jenkins job does reproducible build compare.
 import groovy.json.JsonOutput
 
 pipeline {
-    agent { label 'dockerBuild&&linux&&x64' }
+    agent { label 'win2022&&vs2019&&build&&windows&&x64' }
     parameters {
-        string(name: 'COMPARED_JOB_NUMBER1', defaultValue: '', description: 'Compared nightly build job name')
-        string(name: 'COMPARED_JOB_NUMBER2', defaultValue: '', description: 'Compared nightly build job name')
         string(name: 'COMPARED_JOB_NAME', defaultValue: '', description: 'Compared nightly build job number')
     }
 
@@ -16,43 +14,29 @@ pipeline {
             steps {
                 cleanWs()
                 checkout scm
-                copyArtifacts excludes: '**/OpenJDK*-sbom*metadata.json,**/OpenJDK*-jdk-sources*.tar.gz', 
-                                filter: '**/OpenJDK*-jdk*.tar.gz,**/OpenJDK*-sbom*.json',
-                                fingerprintArtifacts: true, 
-                                flatten: true, 
+                copyArtifacts excludes: '**/OpenJDK*-sbom*metadata.json,**/OpenJDK*-jdk-sources*.tar.gz',
+                                filter: '**/OpenJDK*-jdk*.tar.gz,**/OpenJDK*-jdk*.zip,**/OpenJDK*-sbom*.json',
+                                fingerprintArtifacts: true,
+                                flatten: true,
                                 projectName: "${params.COMPARED_JOB_NAME}",
                                 target: 'original/',
-                                selector: specific("${params.COMPARED_JOB_NUMBER1}")
-                copyArtifacts excludes: '**/OpenJDK*-sbom*metadata.json,**/OpenJDK*-jdk-sources*.tar.gz', 
-                                filter: '**/OpenJDK*-jdk*.tar.gz,**/OpenJDK*-sbom*.json',
-                                fingerprintArtifacts: true, 
-                                flatten: true, 
-                                projectName: "${params.COMPARED_JOB_NAME}",
-                                target: 'reproduced/',
-                                selector: specific("${params.COMPARED_JOB_NUMBER1}")
+                                selector: lastSuccessful()
                 script {
+                    dir('original') {
+	                    def originalJDKFile = findFiles(glob: "*.zip")
+	                    def untarOriginalJDK = sh returnStatus: true, script: "unzip ${originalJDKFile[0].name}"
+	                    if (untarOriginalJDK != 0 ) {
+	                        currentBuild.result = 'UNSTABLE'
+	                        error " Untar ${originalJDKFile[0].name} failed"
+	                        return
+	                    }
+                    }
 
-                    def originalJDKFile = findFiles(glob: "original/*.tar.gz")
-                    def reproducedJDKFile = findFiles(glob: "reproduced/*.tar.gz")
-                    def untarOriginalJDK = sh returnStatus: true, script: "tar xzf ${originalJDKFile[0].path} --strip-components=1 -C original"
-                    if (untarOriginalJDK != 0 ) {
-                        currentBuild.result = 'UNSTABLE'
-                        error " Untar ${originalJDKFile[0].name} failed"
-                        return
-                    }
-                    def untarReproducedJDK = sh returnStatus: true, script: "tar xzf ${reproducedJDKFile[0].path} --strip-components=1 -C reproduced"
-                    if (untarReproducedJDK != 0 ) {
-                        currentBuild.result = 'UNSTABLE'
-                        error " Untar ${originalJDKFile[0].name} failed"
-                        return
-                    }
                     sh """
-                    
-                    find . -type f -name jrt-fs.jar
-                    find . -type f -name '*.tar.gz' -delete
+                    find . -type f -name 'OpenJDK*-jdk*.zip' -delete
                     find . -type f -name '*.json' -delete
-                    cd original/lib
-                    ls
+                    mkdir reproduced
+                    cp -R original/* reproduced
                     """
                 }
             }
@@ -60,7 +44,7 @@ pipeline {
         
         stage('Compare') {
             steps {
-                checkout([$class: 'GitSCM', branches: [[name: 'ReproD']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "temurin-build"]], submoduleCfg: [], userRemoteConfigs: [[url: "https://github.com/sophia-guo/openjdk-build.git"]]])
+                checkout([$class: 'GitSCM', branches: [[name: 'cygwin']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "temurin-build"]], submoduleCfg: [], userRemoteConfigs: [[url: "https://github.com/sophia-guo/openjdk-build.git"]]])
                 script {
                     try {
                         dir('temurin-build/tooling') {
@@ -74,6 +58,7 @@ pipeline {
                             } else if (COMPARED_JOB_NAME.contains('windows')) {
                                 //windows
                                 echo 'todo windows build comparison'
+                                rc = sh returnStatus: true, script: "./repro_compare.sh temurin `pwd`/../../original/jdk-17.0.8+6 temurin `pwd`/../../reproduced/jdk-17.0.8+6 CYGWIN"
                             }
                             if (rc != 0) {
                                 currentBuild.result = 'FAILURE'
@@ -86,7 +71,7 @@ pipeline {
                         echo err.getMessage()
                         currentBuild.result = 'FAILURE'
                     } finally {
-                        cleanWs()
+                        cleanWs disableDeferredWipeout: true, deleteDirs: true
                     }
                 }
             }
