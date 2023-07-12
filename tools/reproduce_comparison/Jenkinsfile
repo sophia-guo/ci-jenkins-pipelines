@@ -6,10 +6,8 @@ import groovy.json.JsonOutput
 env.NODE_LABEL = 'dockerBuild&&linux&&x64'
 pipeline {
     agent { label NODE_LABEL }
-    parameters {
-        string(name: 'COMPARED_JOB_NUMBER', defaultValue: '', description: 'Compared nightly build job name')
-        string(name: 'COMPARED_JOB_NAME', defaultValue: '', description: 'Compared nightly build job number')
-        string(name: 'COMPARED_JOB_PARAMS', defaultValue: '', description: 'Compared nightly build job parameters')
+     parameters {
+        string(name: 'COMPARED_JOB_NAME', defaultValue: '', description: 'Compared nightly build job name')
     }
 
     stages {
@@ -23,67 +21,12 @@ pipeline {
                                 flatten: true, 
                                 projectName: "${params.COMPARED_JOB_NAME}",
                                 target: 'original/',
-                                selector: specific("${params.COMPARED_JOB_NUMBER}")
+                                selector: specific("256")
                 script {
-                    def sbomFiles = findFiles(glob: "**/OpenJDK*-sbom*.json")
-                    def sbomParams = readJSON file: "${sbomFiles[0].path}"
-
-                    def sbomProperties = sbomParams.components[0].properties
-                    def reproducedParams = [:]
-                    sbomProperties.each { propertyItem -> 
-                        def paramFound = false
-                        propertyItem.each { key, value ->
-                            if (value in ["SCM Ref", "Temurin Build Ref", "Build Timestamp"]) {
-                                paramFound = true
-                            }
-                        }
-                        if (paramFound) {
-                            reproducedParams.put(propertyItem.name, propertyItem.value)
-                        }
-                    }
-                    
-                    def scmRef = reproducedParams["SCM Ref"]
-                    def buildTimeStamp = "'" + reproducedParams["Build Timestamp"] + "'"
-                    def buildRef = reproducedParams["Temurin Build Ref"]
-                    buildRef = buildRef.substring(buildRef.lastIndexOf('/')+1)
-
-                    // Convert COMPARED_JOB_PARAMS to json formatt string
-                    def jobParams = COMPARED_JOB_PARAMS.replaceAll("=", ':')
-                    jobParams = jobParams.replace("ADOPT_DEFAULTS_JSON", "ADOPT_DEFAULTS_TEMP")
-                    jobParams = jobParams.replace("DEFAULTS_JSON", "\"DEFAULTS_JSON\"")
-                    jobParams = jobParams.replace("USER_REMOTE_CONFIGS", "\"USER_REMOTE_CONFIGS\"")
-                    jobParams = jobParams.replace("ADOPT_DEFAULTS_TEMP", "\"ADOPT_DEFAULTS_JSON\"")
-                    jobParams = jobParams.replace("BUILD_CONFIGURATION", "\"BUILD_CONFIGURATION\"")
-                    
-                    // Set Reproducible build parameters
-                    def jsonJobParams = new groovy.json.JsonSlurper().parseText(jobParams)
-                    jsonJobParams.BUILD_CONFIGURATION.SCM_REF = scmRef
-                    jsonJobParams.BUILD_CONFIGURATION.BUILD_REF = buildRef
-                    jsonJobParams.BUILD_CONFIGURATION.BUILD_ARGS += " --build-reproducible-date ${buildTimeStamp}"
-                    jsonJobParams.BUILD_CONFIGURATION.ENABLE_REPRODUCIBLE_COMPARE = false
-                    jsonJobParams.BUILD_CONFIGURATION.ENABLE_TESTS = false
-                    jsonJobParams.BUILD_CONFIGURATION.ENABLE_INSTALLERS = false
-                    
-                    if (!COMPARED_JOB_NAME.contains('linux')) {
-                        NODE_LABEL=jsonJobParams.BUILD_CONFIGURATION.NODE_LABEL
-                    }
-                    def buildParams = [
-                        text(name: 'BUILD_CONFIGURATION', value: JsonOutput.prettyPrint(JsonOutput.toJson(jsonJobParams.BUILD_CONFIGURATION))),
-                        text(name: 'USER_REMOTE_CONFIGS', value: JsonOutput.prettyPrint(JsonOutput.toJson(jsonJobParams.USER_REMOTE_CONFIGS))),
-                        text(name: 'DEFAULTS_JSON', value: JsonOutput.prettyPrint(JsonOutput.toJson(jsonJobParams.DEFAULTS_JSON))),
-                        text(name: 'ADOPT_DEFAULTS_JSON', value: JsonOutput.prettyPrint(JsonOutput.toJson(jsonJobParams.DEFAULTS_JSON)))
-                    ]
-                    def reproducibleJob = build job: "${COMPARED_JOB_NAME}",
-                            propagate: false,
-                            parameters: buildParams
-                    
-                    def result = reproducibleJob.getResult()
-                    if (result == 'SUCCESS') {
-                        try {
-                            timeout(time: 2, unit: 'HOURS') {
+                    timeout(time: 2, unit: 'HOURS') {
                                 copyArtifacts(
-                                    projectName:"${COMPARED_JOB_NAME}",
-                                    selector:specific("${reproducibleJob.getNumber()}"),
+                                    projectName: "${params.COMPARED_JOB_NAME}",
+                                    selector:specific("257"),
                                     excludes: '**/OpenJDK*-jdk-sources*.tar.gz',
                                     filter: '**/OpenJDK*-jdk*.tar.gz,**/OpenJDK*-jdk*.zip',
                                     target: 'reproduced/',
@@ -91,44 +34,39 @@ pipeline {
                                     flatten: true
                                 )
                             }
-                        } catch (Exception e) {
-                            echo "Cannot run copyArtifacts from job ${COMPARED_JOB_NAME}. Exception: ${e.message}. Skipping copyArtifacts..."
-                        }
-                    } else {
-                        error "Reproducible jenkins job ${COMPARED_JOB_NAME} failed, exit comparision"
-                        return
+                    if (!COMPARED_JOB_NAME.contains('linux')) {
+                        NODE_LABEL="win2012&&vs2019&&build&&windows&&x64"
                     }
-
                     archiveArtifacts artifacts: '**/OpenJDK*-jdk*.tar.gz,**/OpenJDK*-jdk*.zip', fingerprint: true
                 }
             }
         }
         stage('Compare') {
-            agent NODE_LABEL
+            agent { label NODE_LABEL }
             steps {
                 copyArtifacts filter: '**/OpenJDK*-jdk*.tar.gz,**/OpenJDK*-jdk*.zip',
                     fingerprintArtifacts: true, 
                     projectName: env.JOB_NAME,
                     selector: specific("${env.BUILD_NUMBER}")
-                checkout([$class: 'GitSCM', branches: [[name: 'master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "temurin-build"]], submoduleCfg: [], userRemoteConfigs: [[url: "https://github.com/adoptium/temurin-build.git"]]])
+                checkout([$class: 'GitSCM', branches: [[name: 'cygwin']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "temurin-build"]], submoduleCfg: [], userRemoteConfigs: [[url: "https://github.com/sophia-guo/openjdk-build.git"]]])
             
                 script {
                     if (COMPARED_JOB_NAME.contains('windows')) {
                         def originalJDKFile = findFiles(glob: "original/*.zip")
                         def reproducedJDKFile = findFiles(glob: "reproduced/*.zip")
-                        def untarOriginalJDK = sh returnStatus: true, script: "unzip ${originalJDKFile[0].name}"
+                        def untarOriginalJDK = sh returnStatus: true, script: "cd original && temp=`mktemp -d` && unzip -d ${temp} ${originalJDKFile[0].name} && mv ${temp}/*/* ./ && rmdir ${temp}/* ${temp}"
                         if (untarOriginalJDK != 0 ) {
                             currentBuild.result = 'UNSTABLE'
-                            error " Unzip ${originalJDKFile[0].name} failed"
+                            error " Unzip ${originalJDKFile[0].path} failed"
                             return
                         }
-                        def untarReproducedJDK = sh returnStatus: true, script: "unzip ${originalJDKFile[0].name}"
+                        def untarReproducedJDK = sh returnStatus: true, script: "cd reproduced && temp=`mktemp -d` && unzip -d ${temp} ${reproducedJDKFile[0].name} && mv ${temp}/*/* ./ && rmdir ${temp}/* ${temp}"
                         if (untarReproducedJDK != 0 ) {
                             currentBuild.result = 'UNSTABLE'
                             error " Unzip ${originalJDKFile[0].name} failed"
                             return
                         }
-                        sh "find . -type f -name '*.zip' -delete"
+                        sh "find . -type f -name 'OpenJDK*-jdk*.zip' -delete"
                     } else {
                         def originalJDKFile = findFiles(glob: "original/*.tar.gz")
                         def reproducedJDKFile = findFiles(glob: "reproduced/*.tar.gz")
@@ -144,8 +82,8 @@ pipeline {
                             error " Untar ${reproducedJDKFile[0].name} failed"
                             return
                         }
-                        sh "find . -type f -name '*.tar.gz' -delete"
-                    }                                        
+                        sh "find . -type f -name 'OpenJDK*-jdk*.tar.gz' -delete"
+                    }
                     try {
                         dir('temurin-build/tooling') {
                             def rc = 0
@@ -158,7 +96,7 @@ pipeline {
                             } else if (COMPARED_JOB_NAME.contains('windows')) {
                                 //windows
                                 echo 'todo windows build comparison'
-                                rc = sh returnStatus: true, script: "./repro_compare.sh temurin ${WORKSPACE}/original temurin ${WORKSPACE}/reproduced CYGWIN"
+                                rc = sh returnStatus: true, script: "./repro_compare.sh temurin `pwd`/../../original temurin `pwd`/../../reproduced CYGWIN"
                             }
                             if (rc != 0) {
                                 currentBuild.result = 'FAILURE'
