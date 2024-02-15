@@ -842,13 +842,15 @@ class Builder implements Serializable {
             if (!checkConfigIsSane(jobConfigurations)) {
                 return
             }
-
+            def releaseSummary
             if (release) {
                 if (publishName) {
                     // Keep Jenkins release logs for real releases
                     currentBuild.setKeepLog(keepReleaseLogs)
                     currentBuild.setDisplayName(publishName)
                 }
+                releaseSummary = context.manager.createSummary('next.svg')
+                releaseSummary.appendText('<b>RELEASE PUBLISH BINARIES:</b><ul>', false)
             }
 
             def jobs = [:]
@@ -875,10 +877,6 @@ class Builder implements Serializable {
             context.echo "Force auto generate AQA test jobs: ${aqaAutoGen}"
             context.echo "Keep test reportdir: ${keepTestReportDir}"
             context.echo "Keep release logs: ${keepReleaseLogs}"
-
-            // Disabling for the moment as "manager" only available in postBuild groovy script
-            //def releaseSummary = manager.createSummary('next.svg')
-            //releaseSummary.appendText('<b>RELEASE PUBLISH BINARIES:</b><ul>', false)
 
             jobConfigurations.each { configuration ->
                 jobs[configuration.key] = {
@@ -971,9 +969,10 @@ class Builder implements Serializable {
                                         }
 
                                         copyArtifactSuccess = true
-                                        def (String releaseToolUrl, String releaseComment) = dryrunReleasePublish(config)
-                                        context.echo "dryrunReleasePublish result = ${releaseComment} : ${releaseToolUrl}"
-                                        //releaseSummary.appendText("<li><a href=${releaseToolUrl}> ${releaseComment} ${config.VARIANT} ${publishName} ${config.TARGET_OS} ${config.ARCHITECTURE}</a></li>")
+                                        if (release) {
+                                            def (String releaseToolUrl, String releaseComment) = dryrunReleasePublish(config)
+                                            releaseSummary.appendText("<li><a href=${releaseToolUrl}> ${releaseComment} ${config.VARIANT} ${publishName} ${config.TARGET_OS} ${config.ARCHITECTURE}</a></li>")
+                                        }
                                     }
                             }
                             context.println '[NODE SHIFT] OUT OF CONTROLLER NODE!'
@@ -997,7 +996,9 @@ class Builder implements Serializable {
                 }
             }
             context.parallel jobs
-            //releaseSummary.appendText('</ul>', false)
+            if (release) {
+                releaseSummary.appendText('</ul>', false)
+            }
             // publish to github if needed
             // Don't publish release automatically
             if (publish && !release) {
