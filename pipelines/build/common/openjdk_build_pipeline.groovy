@@ -1435,8 +1435,9 @@ class Build {
                                             """.stripIndent(), returnStdout: true, returnStatus: false).replaceAll('\n', '')
             } else {
                 context.println "Windows detected - running bat to generate SHA256 sums in writeMetadata"
-                hash = context.bat(script: "sha256sum ${file} | cut -f1 -d' '") // .replaceAll('\n', '')
+                hash = context.bat(script: "@sha256sum ${file}", returnStdout: true, returnStatus: false).split(' ').first()
             }
+            context.println "archive sha256 = ${hash}"
 
             data.binary_type = type
             data.sha256 = hash
@@ -2207,6 +2208,7 @@ def buildScriptsAssemble(
                 def enableInstallers = Boolean.valueOf(buildConfig.ENABLE_INSTALLERS)
                 def enableSigner = Boolean.valueOf(buildConfig.ENABLE_SIGNER)
                 def enableTCK = Boolean.valueOf(buildConfig.RELEASE) || Boolean.valueOf(buildConfig.WEEKLY)
+                if ('jdk'.equalsIgnoreCase(buildConfig.JAVA_TO_BUILD.trim())) { enableTCK = false }
                 def useAdoptShellScripts = Boolean.valueOf(buildConfig.USE_ADOPT_SHELL_SCRIPTS)
                 def cleanWorkspace = Boolean.valueOf(buildConfig.CLEAN_WORKSPACE)
                 def cleanWorkspaceAfter = Boolean.valueOf(buildConfig.CLEAN_WORKSPACE_AFTER)
@@ -2571,13 +2573,20 @@ def buildScriptsAssemble(
                                 if (buildConfig.VARIANT == 'temurin' && enableTCK && remoteTriggeredBuilds.asBoolean()) {
                                     remoteTriggeredBuilds.each{ testTargets, jobHandle -> 
                                         context.stage("${testTargets}") {
-                                            while( !jobHandle.isFinished() ) {
-                                                context.println "Current ${testTargets} Status: " + jobHandle.getBuildStatus().toString();
-                                                sleep 3600000
-                                                jobHandle.updateBuildStatus()
+                                            def remoteJobStatus
+                                            if (jobHandle == null || jobHandle.getBuildStatus().toString().equals("NOT_TRIGGERED")) {
+                                                context.println "Failed, remote job ${testTargets} was not triggered"
+                                                remoteJobStatus = "FAILURE"
+                                            } else {
+                                                while( !jobHandle.isFinished() ) {
+                                                    context.println "Current ${testTargets} Status: " + jobHandle.getBuildStatus().toString();
+                                                    sleep 3600000
+                                                    jobHandle.updateBuildStatus()
+                                                }
+                                                remoteJobStatus = jobHandle.getBuildResult().toString()
+                                                context.println "Remote build URL " + jobHandle.getBuildUrl();
                                             }
-                                            context.println "Remote build URL " + jobHandle.getBuildUrl();
-                                            setStageResult("${testTargets}", jobHandle.getBuildResult().toString());
+                                            setStageResult("${testTargets}", remoteJobStatus);
                                         }
                                     }
                                 }
