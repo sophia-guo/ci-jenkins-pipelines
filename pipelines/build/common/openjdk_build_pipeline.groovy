@@ -2574,11 +2574,16 @@ def buildScriptsAssemble(
                                 if (buildConfig.VARIANT == 'temurin' && enableTCK && remoteTriggeredBuilds.asBoolean()) {
                                     remoteTriggeredBuilds.each{ testTargets, jobHandle -> 
                                         context.stage("${testTargets}") {
+<<<<<<< HEAD
                                             def remoteJobStatus
                                             if (jobHandle == null || jobHandle.getBuildStatus().toString().equals("NOT_TRIGGERED")) {
                                                 context.println "Failed, remote job ${testTargets} was not triggered"
                                                 remoteJobStatus = "FAILURE"
                                             } else {
+=======
+                                            def remoteJobStatus = "NOT_BUILD"
+                                            if ( !jobHandle.getBuildStatus().toString().equals("NOT_TRIGGERED") ) {
+>>>>>>> branch 'master' of git@github.com:sophia-guo/ci-jenkins-pipelines.git
                                                 while( !jobHandle.isFinished() ) {
                                                     context.println "Current ${testTargets} Status: " + jobHandle.getBuildStatus().toString();
                                                     sleep 3600000
