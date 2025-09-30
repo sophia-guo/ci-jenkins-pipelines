@@ -3,8 +3,8 @@
         "build_url"          : "https://github.com/adoptium/temurin-build.git",
         "build_branch"       : "master",
         "test_dirs"          : "/test/functional",
-        "pipeline_url"       : "https://github.com/adoptium/ci-jenkins-pipelines.git",
-        "pipeline_branch"    : "master",
+        "pipeline_url"       : "https://github.com/sophia-guo/ci-jenkins-pipelines.git",
+        "pipeline_branch"    : "ibm",
         "helper_ref"         : "master"
     },
     "jenkinsDetails"         : {
@@ -77,5 +77,5 @@
             "numMachines"    : ["3"]
         }
     },
-    "defaultsUrl"            : "https://raw.githubusercontent.com/adoptium/ci-jenkins-pipelines/master/pipelines/defaults.json"
+    "defaultsUrl"            : "https://raw.githubusercontent.com/sophia-guo/ci-jenkins-pipelines/ibm/pipelines/defaults.json"
 }
