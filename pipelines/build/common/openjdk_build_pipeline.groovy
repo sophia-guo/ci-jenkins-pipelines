@@ -658,6 +658,10 @@ class Build {
                 || configureArguments.contains('--disable-headful')) {
             targets.replace("dev.jck", "disabled")
         }
+        
+        if ("${platform}" == 'x86-64_windows') {
+            targets.replace("dev.jck", "disabled")
+        }
 
         if ("${platform}" == 'x86-64_linux' || "${platform}" == 'x86-64_windows' || "${platform}" == 'x86-64_mac') {
             // Primary platforms run extended.jck in Parallel
